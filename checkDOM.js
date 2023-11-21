@@ -31,3 +31,54 @@ const waitForDOMStabilityScript = `
 //   timeout,
 //   debounceTime,
 // ]);
+
+// -----
+
+const waitForElementStability = async (
+  selector,
+  config,
+  callback,
+  timeout = 10000
+) => {
+  await browser.executeAsync(
+    (selector, config, done) => {
+      const targetNode = document.querySelector(selector);
+      if (!targetNode) {
+        return done("Element not found");
+      }
+
+      let lastMutationTime = Date.now();
+      const observer = new MutationObserver((mutations) => {
+        lastMutationTime = Date.now();
+      });
+
+      observer.observe(targetNode, config);
+
+      const checkStability = () => {
+        if (Date.now() - lastMutationTime > 500) {
+          // 500ms of no mutations
+          observer.disconnect();
+          done(); // Call the callback if provided
+        } else {
+          setTimeout(checkStability, 100); // Check again after 100ms
+        }
+      };
+
+      setTimeout(checkStability, 100);
+      setTimeout(() => {
+        observer.disconnect();
+        done("Timeout waiting for element stability");
+      }, timeout);
+    },
+    selector,
+    config
+  );
+};
+
+// Usage
+await waitForElementStability("#elementA", {
+  attributes: true,
+  childList: true,
+  subtree: true,
+  characterData: true,
+});
